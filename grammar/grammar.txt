@@ -1,0 +1,136 @@
+%none ')' ;
+%right 'else' ;
+%left '||' '&&' '==' '<' '>' '+' '-' '*' '/' '.' ;
+%whitespace "[ \n\r]+";
+%start programs;
+
+programs -> programs program $1{value:#2}
+          | program {kind:'program', value:#1};
+
+program -> fundef $1
+         | classdef $1
+         | vardef $1
+         ;
+
+classdef -> 'class' identifier super '{' classbody '}' {kind:'class', name:$2, body:$5, super:$3};
+
+super -> ':' identifier $2
+       |
+       ;
+
+
+classbody  -> classbody classmember $1{member:$2}
+            | classmember {kind:'classbody', member:$1};
+
+classmember -> fielddef $1
+             | fundef $1
+             ;
+
+fielddef -> vardef ';' $1{kind:'fielddef'};
+
+fundef -> type identifier '(' params ')' block {kind:'fundef', type:$1, name:$2, params:$4, block:$6}
+        | 'public' fundef $2{public:true}
+        | 'private' fundef $2{public:false}
+        | 'static' fundef $2{static:true}
+        | 'inline' fundef $2{inline:true}
+        ;
+
+params -> params ',' paramdef $1{value:#3}
+        | paramdef {kind:'params', value:#1}
+        |
+        ;
+
+paramdef -> type identifier {kind:'param', type:$1 , name:$2};
+
+vardef -> type identifier {kind:'vardef', type:$1, name:$2}
+        | type identifier '=' expr {kind:'vardef', type:$1, name:$2, init:$4}
+        | 'public' vardef $2{public:true}
+        | 'private' vardef $2{public:false}
+        | 'static' vardef $2{static:true}
+        ;
+
+block  -> '{' stmts '}' $2
+        | '{' '}'
+        ;
+
+stmts  -> stmts stmt $1{value:#2}
+        | stmt {kind:'stmts', value:#1}
+        ;
+
+stmt   -> expr ';' $1
+        | assign ';' $1
+        | vardef ';' $1
+        | 'return' expr ';' {kind:'return', value:$2}
+        | 'continue' ';' {kind:'continue'}
+        | 'break' ';' {kind:'break'}
+        | block $1
+        | while_stmt $1
+        | do_while_stmt $1
+        | if_stmt $1
+        ;
+
+if_stmt -> 'if' '(' expr ')' stmt {kind:'if', condition:$3, then:$5}
+         | 'if' '(' expr ')' stmt 'else' stmt {kind:'if', condition:$3, then:$5, else:$7}
+         ;
+
+while_stmt -> 'while' '(' expr ')' stmt {kind:'while', condition:$3, body:$5};
+
+do_while_stmt -> 'do' stmt 'while' '(' expr ')' ';' {kind:'do_while', condition:$5, body:$2};
+
+switch_stmt -> 'switch' '(' expr ')' '{' cases default '}' {kind:'switch', condition:$3, cases:$6, default:$7} ;
+cases -> cases case $1{branches:#2}
+       | case {kind:'cases', branches:#1}
+       ;
+case -> 'case' literal ':' stmts {kind:'case', condition:$2, body:$4} ;
+default -> 'default' ':' stmts $3
+         |
+         ;
+
+lhs -> variable $1
+     | dot $1
+     | array $1
+     ;
+
+assign -> lhs '=' expr {kind:'assign', left:$1, right:$3};
+
+type   -> identifier $1;
+
+expr   -> expr '+' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | expr '-' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | expr '*' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | expr '/' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | expr '<' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | expr '>' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | expr '==' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | expr '&&' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | expr '||' expr {kind:'binary', left:$1, op:@2, right:$3}
+        | '(' expr ')' $2
+        | primary $1
+        ;
+
+primary -> literal $1
+         | invoke $1
+         | variable $1
+         | dot $1
+         | array $1
+         ;
+
+variable -> identifier {kind:'variable', name:$1};
+
+dot   -> expr '.' identifier {kind:'dot', lhs:$1, field:$3};
+
+array -> expr '[' expr ']' {kind:'array', lhs:$1, field:$3};
+
+invoke -> identifier '(' args ')' {kind:'invoke', name:$1, args:$3};
+
+args   -> args ',' expr $1{value:#3}
+        | expr {kind:'arg_list', value:#1}
+        |
+        ;
+
+literal -> "\".*\"" {kind:'literal', type:'string', value:@1}
+         | "[0-9]+" {kind:'literal', type:'number', value:@1}
+         | "'(.|\\\\.)'" {kind:'literal', type:'char', value:@1}
+         ;
+
+identifier -> "[a-zA-Z_][a-zA-Z0-9_]*" @1;
