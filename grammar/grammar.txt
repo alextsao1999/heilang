@@ -10,7 +10,15 @@ programs -> programs program $1{value:#2}
 program -> fundef $1
          | classdef $1
          | vardef $1
+         | import $1
          ;
+
+import -> 'import' import_items ';' {kind:'import', items:$2} ;
+import_items -> import_items '.' import_item $1{#3}
+              | import_item #1
+              | {kind:'error', content:'no import item'}
+              ;
+import_item -> identifier $1 | '*' @2 ;
 
 classdef -> 'class' identifier super '{' classbody '}' {kind:'class', name:$2, body:$5, super:$3};
 
@@ -26,7 +34,7 @@ classmember -> fielddef $1
              | fundef $1
              ;
 
-fielddef -> vardef ';' $1{kind:'fielddef'};
+fielddef -> vardef $1{kind:'fielddef'};
 
 fundef -> type identifier '(' params ')' block {kind:'fundef', type:$1, name:$2, params:$4, block:$6}
         | 'public' fundef $2{public:true}
@@ -42,8 +50,8 @@ params -> params ',' param $1{#3}
 
 param -> type identifier {kind:'param', type:$1 , name:$2};
 
-vardef -> type identifier {kind:'vardef', type:$1, name:$2}
-        | type identifier '=' expr {kind:'vardef', type:$1, name:$2, init:$4}
+vardef -> type identifier ';' {kind:'vardef', type:$1, name:$2}
+        | type identifier '=' expr ';' {kind:'vardef', type:$1, name:$2, init:$4}
         | 'public' vardef $2{public:true}
         | 'private' vardef $2{public:false}
         | 'static' vardef $2{static:true}
@@ -59,10 +67,10 @@ stmts  -> stmts stmt $1{value:#2}
 
 stmt   -> expr ';' $1
         | assign ';' $1
-        | vardef ';' $1
         | 'return' expr ';' {kind:'return', value:$2}
         | 'continue' ';' {kind:'continue'}
         | 'break' ';' {kind:'break'}
+        | vardef $1
         | block $1
         | while_stmt $1
         | do_while_stmt $1
@@ -93,7 +101,9 @@ lhs -> variable $1
 
 assign -> lhs '=' expr {kind:'assign', left:$1, right:$3};
 
-type   -> identifier $1;
+type   -> identifier $1
+        | type '*' {kind:'pointer', type:$1}
+        ;
 
 expr   -> expr '+' expr {kind:'binary', left:$1, op:@2, right:$3}
         | expr '-' expr {kind:'binary', left:$1, op:@2, right:$3}
@@ -105,6 +115,7 @@ expr   -> expr '+' expr {kind:'binary', left:$1, op:@2, right:$3}
         | expr '&&' expr {kind:'binary', left:$1, op:@2, right:$3}
         | expr '||' expr {kind:'binary', left:$1, op:@2, right:$3}
         | '(' expr ')' $2
+        | '(' error ')' {kind:'error', value:$2}
         | primary $1
         ;
 
@@ -113,6 +124,7 @@ primary -> literal $1
          | variable $1
          | dot $1
          | array $1
+         | 'new' type '(' args ')' {kind:'new', type:$2, args:$4}
          ;
 
 variable -> identifier {kind:'variable', name:$1};

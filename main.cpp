@@ -12,16 +12,18 @@ int main() {
             "  return 10;"
             "}"
             "void open() {"
-            ""
+            "  int a = 10;"
+            "  a = 1+2;"
             "}"
             "";
+
     Parser<StringIter<>> parser;
     parser.reset(string);
     parser.parse();
     std::cout << parser.value().dump(4) << std::endl;
 
-    Compiler compiler;
-    compiler.compile(parser.value(), "module");
+    //Compiler compiler;
+    //compiler.compile(parser.value(), "module");
 
     return 0;
 }

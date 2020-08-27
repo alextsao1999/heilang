@@ -45,6 +45,28 @@ private:
     Type *walk_param(json &node) override {
         return find_type(node["type"]);
     }
+    Type *walk_array(json &node) override {
+
+    }
+
+    Type *walk_char(json &node) override {
+    }
+
+    Type *walk_binary(json &node) override {
+    }
+
+    Type *walk_assign(json &node) override {
+    }
+
+    Type *walk_invoke(json &node) override {
+    }
+
+    Type *walk_dot(json &node) override {
+    }
+
+    Type *walk_number(json &node) override {
+
+    }
 };
 
 #endif //HEILANG_TYPE_CHECK_H

@@ -6,38 +6,47 @@
 #define HEILANG_COMPILER_H
 
 #include "codegen.h"
-#include "types.h"
+struct Scope {
+    std::map<std::string, Value *> symbols;
+};
 
 class Compiler : Visitor {
 public:
-    LLVMContext context;
-    IRBuilder<> builder;
+    CompileContext context;
     Module *module = nullptr;
     CodeGen codegen;
-    TypeChecker checker;
-    Compiler() : builder(context), codegen(builder), checker(context) {}
+    Compiler() : codegen(context) {}
     void compile(json &node, StringRef ModuleID = "") {
-        module = new Module(ModuleID, context);
+        module = new Module(ModuleID, context.context);
         walk(node);
         llvm::outs() << *module;
-
     }
 
 private:
     void walk_fundef(json &node) override {
-        auto *FT = (FunctionType *) checker.check(node);
+        auto *FT = (FunctionType *) context.checker.check(node);
         auto *F = Function::Create(FT, Function::ExternalLinkage, node["name"].get<std::string>(), module);
-        auto *BB = BasicBlock::Create(context, "entrypoint", F);
-        builder.SetInsertPoint(BB);
+        auto *BB = BasicBlock::Create(context.context, "entrypoint", F);
+        context.builder.SetInsertPoint(BB);
         int index = 0;
         for (auto &arg : F->args()) {
             auto &param = node["params"][index++];
-            auto *alloc = builder.CreateAlloca(checker.check(param), nullptr);
+            auto *alloc = context.builder.CreateAlloca(context.checker.check(param), nullptr);
             alloc->setName(param["name"].get<std::string>());
         }
+        walk(node["block"]);
+    }
+    void walk_stmts(json &node) override {
+        for (auto &item: node["value"]) {
+            codegen.walk(item);
+        }
+    }
+
+    void walk_binary(json &node) override {
 
     }
 
+    void walk_return(json &node) override {}
     void walk_assign(json &node) override {
 
     }
