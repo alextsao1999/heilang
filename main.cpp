@@ -4,19 +4,24 @@
 
 #include "parser.h"
 #include "input.h"
-#include "visitor.h"
+#include "compiler.h"
 int main() {
     const char *string =
-            "int main() {"
+            "int main(int value) {"
             "  open();"
             "  return 10;"
-            "}";
+            "}"
+            "void open() {"
+            ""
+            "}"
+            "";
     Parser<StringIter<>> parser;
     parser.reset(string);
     parser.parse();
     std::cout << parser.value().dump(4) << std::endl;
-    TestVisitor visitor;
-    visitor.visit(parser.value());
+
+    Compiler compiler;
+    compiler.compile(parser.value(), "module");
 
     return 0;
 }

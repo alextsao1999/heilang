@@ -4,90 +4,96 @@
 
 #ifndef HEILANG_VISITOR_H
 #define HEILANG_VISITOR_H
+#include <iostream>
 #include <functional>
 #include "json.hpp"
-class Visitor;
-using visit_func = std::function<void(Visitor *, Value &)>;
-extern std::map<std::string, visit_func> vistor_functions;
-#define ASTList(v)  v(program) \
-                    v(class)   \
-                    v(fielddef)\
-                    v(fundef)  \
-                    v(params)  \
-                    v(param)   \
-                    v(vardef)  \
-                    v(stmts)   \
-                    v(return)  \
-                    v(continue)\
-                    v(break)   \
-                    v(if)      \
-                    v(while)   \
-                    v(do_while)\
-                    v(switch)  \
-                    v(cases)   \
-                    v(case)    \
-                    v(assign)  \
-                    v(binary)  \
-                    v(variable)\
-                    v(dot)     \
-                    v(array)   \
-                    v(invoke)  \
-                    v(literal) \
+#define ASTList(v)  v(program)   \
+                    v(class)     \
+                    v(fielddef)  \
+                    v(fundef)    \
+                    v(param)     \
+                    v(vardef)    \
+                    v(stmts)     \
+                    v(return)    \
+                    v(continue)  \
+                    v(break)     \
+                    v(if)        \
+                    v(while)     \
+                    v(do_while)  \
+                    v(switch)    \
+                    v(cases)     \
+                    v(case)      \
+                    v(assign)    \
+                    v(binary)    \
+                    v(variable)  \
+                    v(dot)       \
+                    v(array)     \
+                    v(invoke)    \
+                    v(number)    \
+                    v(string)    \
+                    v(char)      \
                     v(arg_list)
-
-class Visitor {
+using json = nlohmann::json;
+template <class Value>
+class Walker {
+    using walker_func = std::function<Value(Walker *, json &)>;
+    static std::map<std::string, walker_func> functions;
 public:
-    Visitor() {}
-    virtual void visit(Value &value) {
-        if (value.is_null()) {
-            return;
-        }
-        if (vistor_functions.count(value["kind"])) {
-            vistor_functions[value["kind"]](this, value);
-        } else {
-            error(value);
-        }
-    }
-    virtual void error(Value &value) {
-        std::cout << "Unknow Value " << value << std::endl;
-    }
-#define AddVisitor(kind) virtual void visit_##kind(Value &value) {}
+    virtual Value walk(json &node);
+    virtual void error(json &node) {}
+#define AddVisitor(kind) virtual Value walk_##kind(json &node) { return Value(); }
+    ASTList(AddVisitor)
+#undef  AddVisitor
+};
+template <class Value>
+std::map<std::string, std::function<Value(Walker<Value> *, json &)>> Walker<Value>::functions = {
+#define AddVisitor(kind) {#kind, &Walker<Value>::walk_##kind},
         ASTList(AddVisitor)
 #undef  AddVisitor
 };
-
-std::map<std::string, visit_func> vistor_functions = {
-#define AddVisitor(kind) {#kind, &Visitor::visit_##kind},
-        ASTList(AddVisitor)
-#undef  AddVisitor
+template<class Value>
+Value Walker<Value>::walk(json &node) {
+    if (node.count("kind")) {
+        return functions[node["kind"]](this, node);
+    } else {
+        if (!node.is_null()) {
+            error(node);
+        }
+        return Value();
+    }
 };
 
-class TestVisitor : public Visitor {
+class Visitor : public Walker<void> {
+    inline void walk_values(json &node) {
+        for (auto &item : node) {
+            walk(item);
+        }
+    }
 public:
-    void visit(Value &value) override {
+    void walk(json &node) override {
         try {
-            Visitor::visit(value);
-        } catch (std::exception &e) {
-            std::cout << "error:" << e.what() << " json:" << value << std::endl;
+            Walker::walk(node);
+        } catch (...) {
+            error(node);
         }
     }
-    void visit_program(Value &value) override {
-        for (auto &item : value["value"]) {
-            visit(item);
-        }
-    }
-    void visit_fundef(Value &value) override {
-        //std::cout << "function:" << value["name"] << std::endl;
-        visit(value["block"]);
-    }
-    void visit_stmts(Value &value) override {
-        for (auto &item : value["value"]) {
-            visit(item);
-        }
-    }
-    void visit_return(Value &value) override {
-        //std::cout << "return" << std::endl;
-    }
+    void error(json &node) override;
+    void walk_program(json &node) override;
+    void walk_array(json &node) override;
+    void walk_fundef(json &node) override;
+    void walk_return(json &node) override;
+    void walk_if(json &node) override;
+    void walk_vardef(json &node) override;
+    void walk_do_while(json &node) override;
+    void walk_stmts(json &node) override;
+    void walk_while(json &node) override;
+    void walk_class(json &node) override;
+    void walk_binary(json &node) override;
+    void walk_assign(json &node) override;
+    void walk_invoke(json &node) override;
+    void walk_dot(json &node) override;
+    void walk_arg_list(json &node) override;
 
 };
+
 #endif //HEILANG_VISITOR_H

@@ -55,7 +55,7 @@ extern ParserState ParserStates[];
 extern ReduceAction ParserActions[];
 extern ParserTransition ParserTransitions[];
 
-using Value = nlohmann::json;
+using json = nlohmann::json;
 template <class char_t = char, class char_traits = std::char_traits<char_t>>
 struct ParserNode {
     ParserState *state;
@@ -63,10 +63,10 @@ struct ParserNode {
     int line = 0;
     int column = 0;
     std::basic_string<char_t, char_traits> lexeme;
-    Value value;
+    json value;
     ParserNode(ParserState *state, int symbol = 0) : state(state), symbol(symbol) {}
     ParserNode(ParserState *state, int symbol, int line, int column,
-               const std::basic_string<char_t, char_traits> &lexeme, const Value &value) :
+               const std::basic_string<char_t, char_traits> &lexeme, const json &value) :
             state(state), symbol(symbol),
             line(line), column(column),
             lexeme(lexeme),
@@ -194,7 +194,7 @@ public:
             if (trans->type == 1) { //Shift
                 //debug_shift(trans);
                 stack.emplace_back(trans->state, parser_lexer.symbol(), parser_lexer.line(), parser_lexer.column(),
-                                   parser_lexer.lexeme(), Value());
+                                   parser_lexer.lexeme(), json());
                 parser_lexer.advance();
             } else {
                 reduce(trans);
@@ -204,11 +204,11 @@ public:
             }
         } while (true);
     }
-    Value &value() { return stack[0].value; }
+    json &value() { return stack[0].value; }
     inline void reduce(ParserTransition *trans) {
         auto stack_start = (stack.size() - trans->reduce_length);
         //debug_reduce(trans, stack_start);
-        Value reduce_value;
+        json reduce_value;
         int line = 0;
         int column = 0;
         if (stack_start != stack.size()) {
@@ -270,59 +270,65 @@ public:
         std::cout << std::endl;
 
     }
-    Value handle(ReduceAction *actions, int action_count, Node *nodes) {
+    json handle(ReduceAction *actions, int action_count, Node *nodes) {
         if (action_count == 0) {
             return std::move(nodes->value);
         }
-        Value value;
+        json value;
         for (int i = 0; i < action_count; ++i) {
             auto &action = actions[i];
-            if (action.type == 0) {
+            if (action.type == 0) {  // $n
                 value = std::move((nodes + action.value)->value);
             }
-            if (action.type == 1) {
+            if (action.type == 1) { // @n
                 value = (nodes + action.value)->lexeme.c_str();
             }
-            if (action.type == 2) {
-                // $n set value
+            if (action.type == 2) { // #n
+                value = json::array({std::move((nodes + action.value)->value)});
+            }
+            if (action.type == 3) { // {#n} insert
+                if (!value.is_array()) {
+                    value = json::array({std::move(value)});
+                }
+                value.emplace_back(std::move((nodes + action.value)->value));
+            }
+            if (action.type == 4) { // key:$n set value
                 auto &field = value[std::string(action.field)];
                 if (field.empty()) {
                     field = std::move((nodes + action.value)->value);
                 } else if (field.is_array()) {
                     field.emplace_back(std::move((nodes + action.value)->value));
                 } else {
-                    field = Value::array({std::move(field), std::move((nodes + action.value)->value)});
+                    field = json::array({std::move(field), std::move((nodes + action.value)->value)});
                 }
             }
-            if (action.type == 3) {
-                // @n set lexeme
+            if (action.type == 5) { // key:@n set lexeme
                 value[std::string(action.field)] = (nodes + action.value)->lexeme.c_str();
             }
-            if (action.type == 4) {
-                // #n insert
+            if (action.type == 6) { // key:#n insert
                 auto &field = value[std::string(action.field)];
                 if (field.empty()) {
-                    field = Value::array();
+                    field = json::array();
                 }
                 if (field.is_array()) {
                     field.emplace_back(std::move((nodes + action.value)->value));
                 } else {
-                    field = Value::array({std::move(field), std::move((nodes + action.value)->value)});
+                    field = json::array({std::move(field), std::move((nodes + action.value)->value)});
                 }
-
-            }
-            if (action.type == 5) {
-                value[std::string(action.field)] = action.desc;
-            }
-            if (action.type == 6) {
-                value[std::string(action.field)] = Value::boolean_t(action.value);
             }
             if (action.type == 7) {
-                value[std::string(action.field)] = Value::number_integer_t(action.value);
+                value[std::string(action.field)] = action.desc;
+            }
+            if (action.type == 8) {
+                value[std::string(action.field)] = json::boolean_t(action.value);
+            }
+            if (action.type == 9) {
+                value[std::string(action.field)] = json::number_integer_t(action.value);
             }
         }
         return std::move(value);
     }
+
 };
 
 #endif //TINYLALR_PARSER_H
