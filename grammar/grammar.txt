@@ -19,8 +19,8 @@ super -> ':' identifier $2
        ;
 
 
-classbody  -> classbody classmember $1{member:$2}
-            | classmember {kind:'classbody', member:$1};
+classbody  -> classbody classmember $1{#2}
+            | classmember #1;
 
 classmember -> fielddef $1
              | fundef $1
@@ -35,12 +35,12 @@ fundef -> type identifier '(' params ')' block {kind:'fundef', type:$1, name:$2,
         | 'inline' fundef $2{inline:true}
         ;
 
-params -> params ',' paramdef $1{value:#3}
-        | paramdef {kind:'params', value:#1}
+params -> params ',' param $1{#3}
+        | param #1
         |
         ;
 
-paramdef -> type identifier {kind:'param', type:$1 , name:$2};
+param -> type identifier {kind:'param', type:$1 , name:$2};
 
 vardef -> type identifier {kind:'vardef', type:$1, name:$2}
         | type identifier '=' expr {kind:'vardef', type:$1, name:$2, init:$4}
@@ -128,9 +128,9 @@ args   -> args ',' expr $1{value:#3}
         |
         ;
 
-literal -> "\".*\"" {kind:'literal', type:'string', value:@1}
-         | "[0-9]+" {kind:'literal', type:'number', value:@1}
-         | "'(.|\\\\.)'" {kind:'literal', type:'char', value:@1}
+literal -> "\".*\"" {kind:'string', value:@1}
+         | "[0-9]+" {kind:'number', value:@1}
+         | "'(.|\\\\.)'" {kind:'char', value:@1}
          ;
 
 identifier -> "[a-zA-Z_][a-zA-Z0-9_]*" @1;
